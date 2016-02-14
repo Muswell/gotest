@@ -6,24 +6,25 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 )
 
 // Url is a string which represents a RoundTrip function. Just used for code clarity.
-type roundTrip func(*http.Request) (*http.Response, error)
+type RoundTrip func(*http.Request) (*http.Response, error)
 
 // RegisteredTransport is an http.RoundTripper which maps request urls and methods to a server.
 type RegisteredTransport struct {
 	// Register stores a map of the RoundTrip function to call for a url and method.
-	register map[string]map[string]roundTrip
+	register map[string]map[string]RoundTrip
 }
 
 // Register adds a RoundTrip to the request registry.
-func (tr RegisteredTransport) Register(url, method string, fn roundTrip) {
+func (tr RegisteredTransport) Register(url, method string, fn RoundTrip) {
 	method = strings.ToLower(method)
 	// todo make concurrency safe.
 	if tr.register[url] == nil {
-		tr.register[url] = make(map[string]roundTrip)
+		tr.register[url] = make(map[string]RoundTrip)
 	}
 	tr.register[url][method] = fn
 }
@@ -50,7 +51,7 @@ type RegisteredClient struct {
 	*http.Client
 }
 
-func (rc *RegisteredClient) Register(url, method string, fn roundTrip) {
+func (rc *RegisteredClient) Register(url, method string, fn RoundTrip) {
 	switch t := rc.Transport.(type) {
 	case RegisteredTransport:
 		t.Register(url, method, fn)
@@ -73,7 +74,7 @@ func (rc *RegisteredClient) UnRegister(url, method string) {
 func NewRegisteredClient() *RegisteredClient {
 	return &RegisteredClient{
 		&http.Client{
-			Transport: RegisteredTransport{register: make(map[string]map[string]roundTrip)},
+			Transport: RegisteredTransport{register: make(map[string]map[string]RoundTrip)},
 		},
 	}
 }
@@ -84,3 +85,29 @@ type NopCloser struct {
 }
 
 func (NopCloser) Close() error { return nil }
+
+func NewSimpleRoundTrip(body []byte, headers map[string]string) RoundTrip {
+	return func(req *http.Request) (*http.Response, error) {
+		w := httptest.NewRecorder()
+
+		w.Write(body)
+
+		for k, v := range headers {
+			w.Header().Set(k, v)
+		}
+
+		r := &http.Response{
+			Status:        "200 OK",
+			StatusCode:    200,
+			Proto:         "HTTP/1.0",
+			ProtoMajor:    1,
+			ProtoMinor:    0,
+			Header:        w.Header(),
+			Body:          NopCloser{w.Body},
+			ContentLength: int64(w.Body.Len()),
+			Close:         true,
+			Request:       req,
+		}
+		return r, nil
+	}
+}

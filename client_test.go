@@ -2,9 +2,6 @@ package gotest
 
 import (
 	"io/ioutil"
-	"log"
-	"net/http"
-	"net/http/httptest"
 	"testing"
 )
 
@@ -15,26 +12,10 @@ func TestRegisteredClient(t *testing.T) {
 		t.Errorf("Expected Get request to fail due to url not registered")
 	}
 
-	client.Register(url, "Get", func(req *http.Request) (*http.Response, error) {
-		log.Println("Google RoundTripper called")
-		w := httptest.NewRecorder()
+	headers := make(map[string]string)
+	headers["Content-Type"] = "text/html"
 
-		w.Write([]byte("Hello Google"))
-
-		r := &http.Response{
-			Status:        "200 OK",
-			StatusCode:    200,
-			Proto:         "HTTP/1.0",
-			ProtoMajor:    1,
-			ProtoMinor:    0,
-			Header:        w.Header(),
-			Body:          NopCloser{w.Body},
-			ContentLength: int64(w.Body.Len()),
-			Close:         true,
-			Request:       req,
-		}
-		return r, nil
-	})
+	client.Register(url, "Get", NewSimpleRoundTrip([]byte("Hello Google"), headers))
 
 	resp, err := client.Get(url)
 	if err != nil {
@@ -49,6 +30,10 @@ func TestRegisteredClient(t *testing.T) {
 	s := string(b)
 	if s != "Hello Google" {
 		t.Errorf("incorrect response body got %s expected %s", s, "Hello Google")
+	}
+
+	if resp.Header.Get("Content-Type") != "text/html" {
+		t.Errorf("incorrect response Content-Type got %s expected %s", resp.Header.Get("Content-Type"), "text/html")
 	}
 
 	client.UnRegister(url, "Get")
