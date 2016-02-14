@@ -38,10 +38,11 @@ func (tr RegisteredTransport) UnRegister(url, method string) {
 
 func (tr RegisteredTransport) RoundTrip(r *http.Request) (*http.Response, error) {
 	method := strings.ToLower(r.Method)
-	roundTrip, ok := tr.register[r.URL.Path][method]
+	url := r.URL.String()
+	roundTrip, ok := tr.register[url][method]
 
 	if !ok {
-		return nil, fmt.Errorf("Url %s and Method %s are not registered.", r.URL.Path, method)
+		return nil, fmt.Errorf("Url %s and Method %s are not registered.", url, method)
 	}
 
 	return roundTrip(r)

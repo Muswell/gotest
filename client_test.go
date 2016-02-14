@@ -7,7 +7,7 @@ import (
 
 func TestRegisteredClient(t *testing.T) {
 	client := NewRegisteredClient()
-	url := "http.google.com"
+	url := "http://google.com"
 	if _, err := client.Get(url); err == nil {
 		t.Errorf("Expected Get request to fail due to url not registered")
 	}
